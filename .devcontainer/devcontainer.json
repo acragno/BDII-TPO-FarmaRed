@@ -1,0 +1,61 @@
+{
+  "name": "TPO FarmaRed",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "2.17.0",
+      "moby": true
+    }
+  },
+  "containerEnv": {
+    "MONGO_URI": "mongodb://localhost:27017/?directConnection=true&replicaSet=rs0",
+    "MONGO_DB": "farmared",
+    "NEO4J_URI": "bolt://localhost:7687",
+    "NEO4J_USER": "neo4j",
+    "NEO4J_PASSWORD": "development_password"
+  },
+  "forwardPorts": [27017, 7474, 7687],
+  "portsAttributes": {
+    "27017": {
+      "label": "MongoDB",
+      "onAutoForward": "silent"
+    },
+    "7474": {
+      "label": "Neo4j Browser",
+      "onAutoForward": "notify"
+    },
+    "7687": {
+      "label": "Neo4j Bolt",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "python -m pip install --user -e '.[dev]'",
+  "postStartCommand": "bash -lc 'for i in $(seq 1 60); do if docker info >/dev/null 2>&1; then docker compose up -d; exit 0; fi; sleep 1; done; echo \"Docker daemon no estuvo disponible.\" >&2; exit 1'",
+  "remoteUser": "vscode",
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "16gb"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"],
+        "python.analysis.extraPaths": ["."],
+        "editor.formatOnSave": false
+      }
+    }
+  }
+}
