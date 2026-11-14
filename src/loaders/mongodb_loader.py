@@ -58,6 +58,15 @@ def load_dataset(
     )
 
 
+def clear_database(database: Database) -> dict[str, int]:
+    counts = {
+        name: database[name].count_documents({})
+        for name in database.list_collection_names()
+    }
+    database.client.drop_database(database.name)
+    return counts
+
+
 def ensure_indexes(database: Database) -> dict[str, list[str]]:
     created: dict[str, list[str]] = {}
 

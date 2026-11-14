@@ -69,6 +69,31 @@ class ProjectionReport:
         return sum(self.relationships.values())
 
 
+@dataclass(frozen=True)
+class ClearReport:
+    nodes: int
+    relationships: int
+
+
+def clear_projection(
+    driver: Driver,
+    database: str = "neo4j",
+) -> ClearReport:
+    """Elimina nodos y relaciones - conserva restricciones"""
+    with driver.session(database=database) as session:
+        nodes, relationships = _graph_counts(session)
+        session.execute_write(_delete_all)
+
+    return ClearReport(
+        nodes=sum(nodes.values()),
+        relationships=sum(relationships.values()),
+    )
+
+
+def _delete_all(tx: Transaction) -> None:
+    tx.run("MATCH (n) DETACH DELETE n").consume()
+
+
 def build_projection(
     mongo_db: Database,
     driver: Driver,
