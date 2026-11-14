@@ -7,6 +7,7 @@ import sys
 
 from src import __version__
 from src.config import Config
+from src.loaders.validate import validate_data
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,6 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     show_config.set_defaults(handler=_show_config)
 
+    validate = subparsers.add_parser(
+        "validate-data",
+    )
+    validate.set_defaults(handler=_validate_data)
+
     return parser
 
 
@@ -38,6 +44,25 @@ def _show_config(_: argparse.Namespace) -> int:
     print(f"NEO4J_USER={config.neo4j_user}")
     print("NEO4J_PASSWORD=" + ("*" * 8 if config.neo4j_password else ""))
     print(f"DATA_DIR={config.data_dir}")
+    return 0
+
+
+def _validate_data(_: argparse.Namespace) -> int:
+    config = Config.from_env()
+    result = validate_data(config.data_dir)
+
+    if not result.ok:
+        print(
+            f"Se encontraron {len(result.issues)} errores de validación:",
+            file=sys.stderr,
+        )
+        for issue in result.issues:
+            print(f"  - {issue}", file=sys.stderr)
+        return 1
+
+    print(f"Datos válidos en {config.data_dir}:")
+    for table, count in result.counts().items():
+        print(f"  {table}: {count} registros")
     return 0
 
 
