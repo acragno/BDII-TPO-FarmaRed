@@ -21,7 +21,7 @@ DEFAULT_MONGO_URI = "mongodb://mongo:27017/?replicaSet=rs0"
 DEFAULT_MONGO_DB = "farmared"
 DEFAULT_NEO4J_URI = "bolt://neo4j:7687"
 DEFAULT_NEO4J_USER = "neo4j"
-DEFAULT_NEO4J_PASSWORD = "password"
+DEFAULT_NEO4J_PASSWORD = "development_password"
 
 
 @dataclass(frozen=True)

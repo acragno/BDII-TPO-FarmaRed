@@ -5,12 +5,15 @@ from __future__ import annotations
 import argparse
 import sys
 
+from neo4j.exceptions import DriverError, Neo4jError
 from pymongo.errors import PyMongoError
 
 from src import __version__
 from src.config import Config
 from src.db.mongo import MongoUnavailableError, get_database, wait_for_mongo
+from src.db.neo4j import Neo4jUnavailableError, wait_for_neo4j
 from src.loaders.mongodb_loader import ensure_indexes, load_dataset
+from src.loaders.neo4j_projection import ProjectionError, build_projection
 from src.loaders.validate import ValidationResult, validate_data
 
 
@@ -41,6 +44,11 @@ def build_parser() -> argparse.ArgumentParser:
         "load-mongodb",
     )
     load_mongodb.set_defaults(handler=_load_mongodb)
+
+    build_neo4j = subparsers.add_parser(
+        "build-neo4j",
+    )
+    build_neo4j.set_defaults(handler=_build_neo4j)
 
     return parser
 
@@ -112,6 +120,45 @@ def _print_validation_issues(result: ValidationResult) -> None:
     )
     for issue in result.issues:
         print(f"  - {issue}", file=sys.stderr)
+
+
+def _build_neo4j(_: argparse.Namespace) -> int:
+    config = Config.from_env()
+    mongo_client = None
+    neo4j_driver = None
+
+    try:
+        mongo_client = wait_for_mongo(config, timeout=30)
+        neo4j_driver = wait_for_neo4j(config, timeout=30)
+        report = build_projection(
+            get_database(mongo_client, config), neo4j_driver
+        )
+    except (
+        MongoUnavailableError,
+        Neo4jUnavailableError,
+        ProjectionError,
+    ) as error:
+        print(f"No se pudo construir la proyección: {error}", file=sys.stderr)
+        return 1
+    except PyMongoError as error:
+        print(f"Error leyendo MongoDB: {error}", file=sys.stderr)
+        return 1
+    except (DriverError, Neo4jError) as error:
+        print(f"Error escribiendo en Neo4j: {error}", file=sys.stderr)
+        return 1
+    finally:
+        if mongo_client is not None:
+            mongo_client.close()
+        if neo4j_driver is not None:
+            neo4j_driver.close()
+
+    print("Proyección de Neo4j reconstruida desde MongoDB:")
+    print(f"  restricciones de unicidad: {len(report.constraints)}")
+    for label, count in report.nodes.items():
+        print(f"  {label}: {count} nodos")
+    for name, count in report.relationships.items():
+        print(f"  {name}: {count} relaciones")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
