@@ -28,3 +28,6 @@ include = ["src*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "integration: requiere MongoDB y Neo4j disponibles",
+]
