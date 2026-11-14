@@ -1,0 +1,78 @@
+name: farmared
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: farmared-mongo
+    restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-farmared}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - farmared
+
+  mongo-init: # inicia el replica set
+    image: mongo:7.0
+    container_name: farmared-mongo-init
+    restart: "no"
+    depends_on:
+      - mongo
+    volumes:
+      - ./docker/mongo-init:/scripts:ro
+    entrypoint: ["/bin/sh", "/scripts/init-entrypoint.sh"]
+    networks:
+      - farmared
+
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: farmared-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-development_password}
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512m
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - farmared
+
+networks:
+  farmared:
+    name: farmared
+
+volumes:
+  mongo-data:
+    name: farmared-mongo-data
+  neo4j-data:
+    name: farmared-neo4j-data
+  neo4j-logs:
+    name: farmared-neo4j-logs
