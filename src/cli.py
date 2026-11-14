@@ -5,9 +5,13 @@ from __future__ import annotations
 import argparse
 import sys
 
+from pymongo.errors import PyMongoError
+
 from src import __version__
 from src.config import Config
-from src.loaders.validate import validate_data
+from src.db.mongo import MongoUnavailableError, get_database, wait_for_mongo
+from src.loaders.mongodb_loader import ensure_indexes, load_dataset
+from src.loaders.validate import ValidationResult, validate_data
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -33,6 +37,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate.set_defaults(handler=_validate_data)
 
+    load_mongodb = subparsers.add_parser(
+        "load-mongodb",
+    )
+    load_mongodb.set_defaults(handler=_load_mongodb)
+
     return parser
 
 
@@ -52,18 +61,57 @@ def _validate_data(_: argparse.Namespace) -> int:
     result = validate_data(config.data_dir)
 
     if not result.ok:
-        print(
-            f"Se encontraron {len(result.issues)} errores de validación:",
-            file=sys.stderr,
-        )
-        for issue in result.issues:
-            print(f"  - {issue}", file=sys.stderr)
+        _print_validation_issues(result)
         return 1
 
     print(f"Datos válidos en {config.data_dir}:")
     for table, count in result.counts().items():
         print(f"  {table}: {count} registros")
     return 0
+
+
+def _load_mongodb(_: argparse.Namespace) -> int:
+    config = Config.from_env()
+    result = validate_data(config.data_dir)
+
+    if not result.ok:
+        _print_validation_issues(result)
+        return 1
+
+    try:
+        client = wait_for_mongo(config)
+    except MongoUnavailableError as error:
+        print(f"No se pudo conectar a MongoDB: {error}", file=sys.stderr)
+        print("Verificá el entorno con 'docker compose up -d'.", file=sys.stderr)
+        return 1
+
+    try:
+        database = get_database(client, config)
+        report = load_dataset(database, result.records)
+        indexes = ensure_indexes(database)
+    except PyMongoError as error:
+        print(f"Error al cargar MongoDB: {error}", file=sys.stderr)
+        return 1
+    finally:
+        client.close()
+
+    print(f"Datos cargados en MongoDB ('{config.mongo_db}'):")
+    for table, count in report.collections.items():
+        print(f"  {table}: {count} documentos")
+    print(f"  ventas.items: {report.items} detalles embebidos")
+    print("Índices:")
+    for table, names in indexes.items():
+        print(f"  {table}: {', '.join(names)}")
+    return 0
+
+
+def _print_validation_issues(result: ValidationResult) -> None:
+    print(
+        f"Se encontraron {len(result.issues)} errores de validación:",
+        file=sys.stderr,
+    )
+    for issue in result.issues:
+        print(f"  - {issue}", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
