@@ -65,6 +65,28 @@ services:
     networks:
       - farmared
 
+  outbox-worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    container_name: farmared-outbox-worker
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+      MONGO_DB: ${MONGO_DB:-farmared}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-development_password}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+      neo4j:
+        condition: service_healthy
+    networks:
+      - farmared
+
   neo4j-test:
     image: neo4j:5.26-community
     container_name: farmared-neo4j-test

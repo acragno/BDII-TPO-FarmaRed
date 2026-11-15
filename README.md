@@ -107,6 +107,7 @@ Servicios:
 | `mongo`      | `mongo:7.0`            | `27017`        | MongoDB como replica set `rs0`     |
 | `mongo-init` | `mongo:7.0`            | —              | One-shot que inicia el replica set |
 | `neo4j`      | `neo4j:5.26-community` | `7474`, `7687` | Proyección de grafos               |
+| `outbox-worker` | Build local | — | Sincroniza eventos de MongoDB con Neo4j |
 | `neo4j-test` | `neo4j:5.26-community` | `7688` | Neo4j desechable para pruebas de consultas (perfil `test`) |
 
 Los datos persisten en los volúmenes `farmared-mongo-data`, `farmared-neo4j-data` y `farmared-neo4j-logs`.
@@ -136,6 +137,23 @@ python -m src.cli seed
 | `python -m src.cli reset`             | Limpia MongoDB y la proyección de Neo4j |
 
 Los comandos `wait-for-services`, `build-neo4j`, `seed` y `reset` aceptan `--timeout <segundos>` (60 por defecto). El script `scripts/seed.sh` levanta Docker y delega en `seed`.
+
+### Worker de outbox
+
+`docker compose up -d` inicia un único worker después de que MongoDB y
+Neo4j estén saludables y `mongo-init` termine correctamente. La inicialización
+de colecciones, índices y grafo sigue realizándose con el CLI (`seed`).
+
+El worker solo consulta `outbox`: lee hasta 50 eventos `Pending`, ordenados por
+`created_at` e `_id`. Procesa los siguientes lotes inmediatamente y espera un
+segundo cuando no hay eventos, incluso si la colección todavía no existe.
+Marca cada evento como `Processed` después del commit en Neo4j. Si falla un
+intento, conserva el evento pendiente y reintenta con esperas de 2, 4, 8, 16 y
+30 segundos, sin adelantar los eventos posteriores, `attempts` cuenta los intentos de procesamiento.
+
+Las escrituras a Neo4j son idempotentes y la baja conserva el nodo y sus relaciones.
+
+Para ver los intentos: `docker compose logs -f outbox-worker`.
 
 ---
 
