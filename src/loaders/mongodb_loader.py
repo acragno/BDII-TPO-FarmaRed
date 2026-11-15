@@ -103,6 +103,13 @@ def ensure_indexes(database: Database) -> dict[str, list[str]]:
         )
     ]
 
+    created["outbox"] = [
+        database["outbox"].create_index(
+            [("state", 1), ("created_at", 1)],
+            name="idx_outbox_state_created_at",
+        )
+]
+
     return created
 
 
