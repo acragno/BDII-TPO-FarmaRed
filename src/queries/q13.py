@@ -91,14 +91,20 @@ def q13Update(db: Database, mongo_client: MongoClient, client_id: str, modificat
     }
 
     def callback(session: ClientSession) -> dict[str, Any]:
-        result = db["clientes"].update_one(
-                    {"_id": client_id},
-                    {"$set": document},
-                    upsert=False,
-                    session=session)
-        
-        if result.matched_count == 0:
+        current_client = db["clientes"].find_one({"_id": client_id}, session=session)
+        if current_client is None:
             raise ValueError(f"No existe el cliente con id {client_id}")
+
+        updated_client = {**current_client, **document}
+        _validate_coverage(
+            updated_client["obra_social"], updated_client.get("nro_afiliado", "")
+        )
+
+        result = db["clientes"].update_one(
+            {"_id": client_id},
+            {"$set": document},
+            upsert=False,
+            session=session)
 
         if result.modified_count == 1:
             register_event(db, event=event, session=session)
@@ -167,9 +173,6 @@ def _validate_client_modifications(modifications: dict[str, Any]) -> dict[str, A
 
     if "obra_social" in documento and documento["obra_social"] not in INSURANCES:
         raise ValueError(f"'obra_social' debe ser una de: {', '.join(INSURANCES)}")
-
-    if documento.get("nro_afiliado") == "" and documento.get("obra_social") != "Sin cobertura":
-        raise ValueError("'nro_afiliado' solo puede estar vacío con 'Sin cobertura'")
 
     return documento
 
