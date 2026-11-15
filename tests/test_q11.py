@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from src.loaders.mongodb_loader import load_dataset
 from src.loaders.validate import validate_data
-from src.queries.q11 import ZONA_HORARIA_ARG, q11
+from src.queries.q11 import q11
 from tests.support import DATA_DIR
 
 
@@ -259,9 +259,51 @@ def test_q11_cambio_de_anio_diciembre(mongo_test_db) -> None:
     assert resultado[0]["ingresos"] == 500
 
 
+def test_q11_usa_now_del_servidor_sin_inyectar() -> None:
+    """Verifica que sin inyectar 'ahora' el $match use $$NOW y no una fecha de Python."""
+
+    class _FakeCollection:
+        def __init__(self) -> None:
+            self.pipelines: list[list[dict]] = []
+
+        def aggregate(self, pipeline):
+            self.pipelines.append(pipeline)
+            return []
+
+    class _FakeDB:
+        def __init__(self) -> None:
+            self.collection = _FakeCollection()
+
+        def __getitem__(self, name: str) -> _FakeCollection:
+            return self.collection
+
+    fake_db = _FakeDB()
+    assert q11(fake_db) == []  # type: ignore[arg-type]
+
+    filtro = fake_db.collection.pipelines[0][0]["$match"]
+    assert filtro["estado"] == "Completada"
+    assert "fecha" not in filtro
+    assert filtro["$expr"] == {
+        "$and": [
+            {"$eq": [{"$year": "$fecha"}, {"$year": "$$NOW"}]},
+            {"$eq": [{"$month": "$fecha"}, {"$month": "$$NOW"}]},
+        ]
+    }
+
+    # Con 'ahora' inyectado no se usa $$NOW: se filtra por rango explícito en UTC.
+    fake_db.collection.pipelines.clear()
+    q11(fake_db, ahora=datetime(2026, 10, 15))  # type: ignore[arg-type]
+    filtro_inyectado = fake_db.collection.pipelines[0][0]["$match"]
+    assert "$expr" not in filtro_inyectado
+    assert filtro_inyectado["fecha"] == {
+        "$gte": datetime(2026, 10, 1, tzinfo=timezone.utc),
+        "$lt": datetime(2026, 11, 1, tzinfo=timezone.utc),
+    }
+
+
 @pytest.mark.integration
-def test_q11_zonas_horarias(mongo_test_db) -> None:
-    """Verifica que ahora con tz aware se convierta correctamente a UTC-3."""
+def test_q11_conversion_utc(mongo_test_db) -> None:
+    """Verifica que 'ahora' se interprete y convierta a UTC (sin aplicar UTC-3)."""
     mongo_test_db["ventas"].delete_many({})
     mongo_test_db["farmaceuticos"].delete_many({})
 
@@ -281,22 +323,39 @@ def test_q11_zonas_horarias(mongo_test_db) -> None:
     ]
     mongo_test_db["ventas"].insert_many(ventas)
 
-    # 2026-11-01 01:00 UTC son las 22:00 del 31 de octubre en UTC-3 -> El mes es octubre
-    ahora_utc_oct = datetime(2026, 11, 1, 1, 0, 0, tzinfo=timezone.utc)
-    res_oct = q11(mongo_test_db, ahora=ahora_utc_oct)
-    assert len(res_oct) == 1
-    assert res_oct[0]["ingresos"] == 1000
+    # Naive se interpreta como UTC: 2026-10-15 pertenece a octubre.
+    res_naive_oct = q11(mongo_test_db, ahora=datetime(2026, 10, 15))
+    assert len(res_naive_oct) == 1
+    assert res_naive_oct[0]["ingresos"] == 1000
 
-    # 2026-11-01 03:00 UTC son las 00:00 del 1 de noviembre en UTC-3 -> El mes es noviembre
-    ahora_utc_nov = datetime(2026, 11, 1, 3, 0, 0, tzinfo=timezone.utc)
-    res_nov = q11(mongo_test_db, ahora=ahora_utc_nov)
-    assert len(res_nov) == 1
-    assert res_nov[0]["ingresos"] == 2000
+    # 2026-11-01 01:00 UTC sigue siendo noviembre en UTC (antes era octubre en UTC-3).
+    res_utc_nov = q11(
+        mongo_test_db, ahora=datetime(2026, 11, 1, 1, 0, 0, tzinfo=timezone.utc)
+    )
+    assert len(res_utc_nov) == 1
+    assert res_utc_nov[0]["ingresos"] == 2000
+
+    # Aware en UTC-3 se convierte a UTC: 2026-10-31 23:00-03 = 2026-11-01 02:00 UTC.
+    zona_utc_menos_3 = timezone(timedelta(hours=-3))
+    res_aware_nov = q11(
+        mongo_test_db,
+        ahora=datetime(2026, 10, 31, 23, 0, 0, tzinfo=zona_utc_menos_3),
+    )
+    assert len(res_aware_nov) == 1
+    assert res_aware_nov[0]["ingresos"] == 2000
+
+    # La misma fecha aware, pero antes de la medianoche UTC, pertenece a octubre.
+    res_aware_oct = q11(
+        mongo_test_db,
+        ahora=datetime(2026, 10, 31, 20, 0, 0, tzinfo=zona_utc_menos_3),
+    )
+    assert len(res_aware_oct) == 1
+    assert res_aware_oct[0]["ingresos"] == 1000
 
 
 @pytest.mark.integration
 def test_q11_fecha_sistema_sin_inyectar(mongo_test_db) -> None:
-    """Verifica que sin inyectar ahora, una venta completada en la fecha de hoy aparezca."""
+    """Verifica que sin inyectar ahora se use $$NOW (mes actual del servidor MongoDB)."""
     mongo_test_db["ventas"].delete_many({})
     mongo_test_db["farmaceuticos"].delete_many({})
 
@@ -309,18 +368,39 @@ def test_q11_fecha_sistema_sin_inyectar(mongo_test_db) -> None:
         "activo": True,
     })
 
-    # Fecha de hoy a medianoche UTC
-    hoy_local = datetime.now(ZONA_HORARIA_ARG).date()
-    fecha_hoy_utc = datetime(hoy_local.year, hoy_local.month, hoy_local.day, tzinfo=timezone.utc)
+    # Fecha/hora actual del servidor MongoDB (misma referencia que evalúa $$NOW).
+    server_time = mongo_test_db.command("hello")["localTime"]
+    if server_time.tzinfo is None:
+        server_time = server_time.replace(tzinfo=timezone.utc)
 
-    mongo_test_db["ventas"].insert_one({
-        "_id": "V_HOY",
-        "id_venta": "V_HOY",
-        "id_farmaceutico": "F_HOY",
-        "total": 4500,
-        "estado": "Completada",
-        "fecha": fecha_hoy_utc,
-    })
+    # Venta en el mes actual del servidor y otra en el mes anterior (debe quedar afuera).
+    if server_time.month == 1:
+        mes_anterior = datetime(server_time.year - 1, 12, 15, tzinfo=timezone.utc)
+    else:
+        mes_anterior = datetime(
+            server_time.year, server_time.month - 1, 15, tzinfo=timezone.utc
+        )
+
+    mongo_test_db["ventas"].insert_many([
+        {
+            "_id": "V_HOY",
+            "id_venta": "V_HOY",
+            "id_farmaceutico": "F_HOY",
+            "total": 4500,
+            "estado": "Completada",
+            "fecha": server_time.replace(
+                day=15, hour=12, minute=0, second=0, microsecond=0
+            ),
+        },
+        {
+            "_id": "V_MES_ANTERIOR",
+            "id_venta": "V_MES_ANTERIOR",
+            "id_farmaceutico": "F_HOY",
+            "total": 9999,
+            "estado": "Completada",
+            "fecha": mes_anterior,
+        },
+    ])
 
     res = q11(mongo_test_db)
     assert len(res) == 1
