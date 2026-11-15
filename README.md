@@ -139,6 +139,24 @@ Los comandos `wait-for-services`, `build-neo4j`, `seed` y `reset` aceptan `--tim
 
 ---
 
+## Consultas MongoDB
+
+Estas consultas se ejecutan sobre MongoDB y muestran sus resultados en JSON. Antes de ejecutarlas, levantar los servicios y cargar los datos como se indica en el inicio.
+
+| Consulta | Descripción | Ejecución | Prueba individual |
+| --- | --- | --- | --- |
+| Q01 | Productos activos con los datos completos de su proveedor habitual (o `null` si no posee), ordenados por ID de producto. | `python -m src.queries.q01` | `pytest tests/test_q01.py` |
+| Q07 | Top 5 productos más vendidos en unidades considerando solo ventas completadas, ordenados por unidades e ID de producto. | `python -m src.queries.q07` | `pytest tests/test_q07.py` |
+| Q08 | Lotes con stock bajo (menos de 50 unidades), detallando producto, sucursal y proveedor, ordenados por unidades e ID de lote. | `python -m src.queries.q08` | `pytest tests/test_q08.py` |
+| Q09 | Ventas de tipo «Venta libre» no anuladas con total menor a $5.000, ordenadas cronológicamente por fecha e ID de venta. | `python -m src.queries.q09` | `pytest tests/test_q09.py` |
+| Q11 | Ingresos totales acumulados en el mes actual por farmacéutico a partir de ventas completadas, ordenados de forma decreciente. | `python -m src.queries.q11` | `pytest tests/test_q11.py` |
+
+Q11 calcula la ventana del mes actual considerando la zona horaria de Argentina (UTC-3). Permite pasar opcionalmente `--ahora AAAA-MM-DD` para fijar una fecha de referencia alternativa (por ejemplo, `python -m src.queries.q11 --ahora 2026-10-15`).
+
+A diferencia de Neo4j, las pruebas de consultas de MongoDB **no requieren un servicio aislado adicional ni perfiles especiales de Docker**. Se ejecutan contra el contenedor estándar `mongo` utilizando una base de datos efímera (`farmared_test`), que el fixture `mongo_test_db` crea y descarta automáticamente antes y después de cada prueba sin alterar la base de datos operativa `farmared`.
+
+---
+
 ## Consultas Neo4j
 
 Estas consultas se ejecutan sobre Neo4j y muestran sus resultados en JSON. Antes de ejecutarlas, levantar los servicios y cargar los datos como se indica en el inicio.
@@ -184,6 +202,16 @@ NEO4J_TEST_USER='neo4j' \
 NEO4J_TEST_PASSWORD='test_password' \
 pytest
 ```
+
+### Pruebas de consultas MongoDB
+
+Para ejecutar juntas las pruebas de integración de las consultas de MongoDB (Q01, Q07, Q08, Q09 y Q11), con el servicio `mongo` levantado:
+
+```bash
+pytest tests/test_q01.py tests/test_q07.py tests/test_q08.py tests/test_q09.py tests/test_q11.py
+```
+
+Estas pruebas utilizan la base de datos efímera `farmared_test` dentro del contenedor habitual de MongoDB y se limpian automáticamente en cada ejecución. No requieren levantar `neo4j-test` ni configurar perfiles de Docker adicionales.
 
 ### Pruebas de consultas Neo4j aisladas
 
