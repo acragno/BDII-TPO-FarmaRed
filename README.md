@@ -207,6 +207,25 @@ export NEO4J_TEST_PASSWORD='test_password'
 
 ---
 
+## Servicios
+
+Estos servicios realizan escrituras en MongoDB y muestran sus resultados en JSON.
+Antes de ejecutarlos, levantar los servicios y cargar los datos con `python -m src.cli seed`.
+Cada cambio se guarda junto con su evento en `outbox`, dentro de la misma transacción,
+para que el worker actualice la proyección de Neo4j.
+
+| Servicio | Descripción | Ejecución | Prueba individual |
+| --- | --- | --- | --- |
+| Q13 — Alta | Crea un cliente validando sus datos, cobertura y DNI único. | `python -m src.queries.q13 alta --archivo cliente.json` | `pytest tests/test_q13.py` |
+| Q13 — Modificación | Actualiza los datos de contacto y cobertura de un cliente existente, validando la cobertura resultante. | `python -m src.queries.q13 modificacion C001 --archivo cambios.json` | `pytest tests/test_q13.py` |
+| Q13 — Baja lógica | Establece `activo = false` en un cliente existente, conservando sus datos históricos. | `python -m src.queries.q13 baja C001` | `pytest tests/test_q13.py` |
+
+`cliente.json` debe contener los datos del cliente a crear. `cambios.json` debe ser
+un objeto JSON con uno o más de estos campos: `email`, `telefono`, `obra_social` y
+`nro_afiliado`. Reemplazar `C001` por el ID del cliente que se desea modificar o dar de baja.
+
+---
+
 ## Pruebas
 
 Comandos útiles:
