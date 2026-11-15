@@ -169,10 +169,14 @@ Estas consultas se ejecutan sobre Neo4j y muestran sus resultados en JSON. Antes
 | Q05 | Farmacéuticos activos y cantidad de ventas de los últimos 60 días, excluyendo anuladas e incluyendo profesionales con cero ventas. | `python -m src.queries.q05` | `pytest tests/test_q05.py` |
 | Q06 | Recetas vigentes de tratamiento prolongado cuya próxima dispensa es anterior a hoy, con los datos del cliente. | `python -m src.queries.q06` | `pytest tests/test_q06.py` |
 | Q10 | Clientes distintos atendidos en una sucursal, a través del farmacéutico que registró la venta, esté activo o no. | `python -m src.queries.q10 S001` | `pytest tests/test_q10.py` |
+| Q12 | Clientes sin ventas registradas en el último año calendario, incluidos quienes nunca compraron; cualquier estado de venta cuenta. | `python -m src.queries.q12` | `pytest tests/test_q12.py` |
+
 
 Reemplazar `C001` por el ID del cliente a consultar y `S001` por el ID de la sucursal a
 consultar. Q05 usa hoy y los 59 días anteriores; Q06 excluye las dispensas
-previstas para hoy. Ambas calculan la fecha actual en la zona horaria de Argentina.
+previstas para hoy. Q12 incluye desde la misma fecha del año anterior hasta hoy;
+para el 29 de febrero toma el 28 de febrero del año anterior. Las tres calculan
+la fecha actual en la zona horaria de Argentina.
 
 Las pruebas de la tabla requieren el servicio aislado `neo4j-test`. Prepararlo una vez antes de ejecutar las pruebas individuales:
 
@@ -216,11 +220,10 @@ Estas pruebas utilizan la base de datos efímera `farmared_test` dentro del cont
 ### Pruebas de consultas Neo4j aisladas
 
 El servicio `neo4j-test` no se inicia con los servicios habituales.
-Para ejecutar juntas las pruebas de Q02, Q03, Q04, Q05, Q06 y Q10, usar la
-preparación indicada en «Consultas Neo4j» y luego:
+Para ejecutar juntas las pruebas de Q02, Q03, Q04, Q05, Q06, Q10 y Q12, usar la preparación indicada en «Consultas Neo4j» y luego:
 
 ```bash
-pytest tests/test_q02.py tests/test_q03.py tests/test_q04.py tests/test_q05.py tests/test_q06.py tests/test_q10.py
+pytest tests/test_q02.py tests/test_q03.py tests/test_q04.py tests/test_q05.py tests/test_q06.py tests/test_q10.py  tests/test_q12.py
 ```
 
 El fixture falla con un mensaje accionable si el servicio no está disponible o
