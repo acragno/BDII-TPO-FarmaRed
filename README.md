@@ -151,7 +151,7 @@ Estas consultas se ejecutan sobre MongoDB y muestran sus resultados en JSON. Ant
 | Q09 | Ventas de tipo «Venta libre» no anuladas con total menor a $5.000, ordenadas cronológicamente por fecha e ID de venta. | `python -m src.queries.q09` | `pytest tests/test_q09.py` |
 | Q11 | Ingresos totales acumulados en el mes actual por farmacéutico a partir de ventas completadas, ordenados de forma decreciente. | `python -m src.queries.q11` | `pytest tests/test_q11.py` |
 
-Q11 calcula la ventana del mes actual considerando la zona horaria de Argentina (UTC-3). Permite pasar opcionalmente `--ahora AAAA-MM-DD` para fijar una fecha de referencia alternativa (por ejemplo, `python -m src.queries.q11 --ahora 2026-10-15`).
+Q11 calcula la ventana del mes actual usando la fecha/hora del servidor de MongoDB (`$$NOW`, en UTC). Permite pasar opcionalmente `--ahora AAAA-MM-DD` para fijar una fecha de referencia alternativa, interpretada en UTC (por ejemplo, `python -m src.queries.q11 --ahora 2026-10-15`). La fecha/hora de referencia utilizada se informa por `stderr`, de modo que `stdout` conserva el JSON válido.
 
 A diferencia de Neo4j, las pruebas de consultas de MongoDB **no requieren un servicio aislado adicional ni perfiles especiales de Docker**. Se ejecutan contra el contenedor estándar `mongo` utilizando una base de datos efímera (`farmared_test`), que el fixture `mongo_test_db` crea y descarta automáticamente antes y después de cada prueba sin alterar la base de datos operativa `farmared`.
 
