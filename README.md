@@ -6,7 +6,8 @@
 - **Docker** con Docker Compose v2 (Docker Desktop en macOS/Windows o Docker
   Engine en Linux).
 - 4 GB de memoria y 16 GB de disco libres (recomendado para Codespaces).
-- Puertos libres: `27017` (MongoDB), `7474` (Neo4j Browser), `7687` (Neo4j Bolt).
+- Puertos libres: `27017` (MongoDB), `7474` (Neo4j Browser), `7687` (Neo4j Bolt)
+  y `7688` (Neo4j Bolt de pruebas).
 
 Dependencias de Python: `pymongo`, `neo4j` y `python-dotenv`; `pytest` para las pruebas. Están declaradas en [`pyproject.toml`](pyproject.toml).
 
@@ -32,6 +33,10 @@ Dependencias de Python: `pymongo`, `neo4j` y `python-dotenv`; `pytest` para las 
 
     ```bash
     python -m src.cli wait-for-services
+    docker compose --profile test up -d --wait neo4j-test
+    NEO4J_TEST_URI='bolt://localhost:7688' \
+    NEO4J_TEST_USER='neo4j' \
+    NEO4J_TEST_PASSWORD='test_password' \
     pytest
     ```
 
@@ -102,6 +107,7 @@ Servicios:
 | `mongo`      | `mongo:7.0`            | `27017`        | MongoDB como replica set `rs0`     |
 | `mongo-init` | `mongo:7.0`            | —              | One-shot que inicia el replica set |
 | `neo4j`      | `neo4j:5.26-community` | `7474`, `7687` | Proyección de grafos               |
+| `neo4j-test` | `neo4j:5.26-community` | `7688` | Neo4j desechable para pruebas de consultas (perfil `test`) |
 
 Los datos persisten en los volúmenes `farmared-mongo-data`, `farmared-neo4j-data` y `farmared-neo4j-logs`.
 
@@ -133,6 +139,34 @@ Los comandos `wait-for-services`, `build-neo4j`, `seed` y `reset` aceptan `--tim
 
 ---
 
+## Consultas Neo4j
+
+Estas consultas se ejecutan sobre Neo4j y muestran sus resultados en JSON. Antes de ejecutarlas, levantar los servicios y cargar los datos como se indica en el inicio.
+
+| Consulta | Descripción | Ejecución | Prueba individual |
+| --- | --- | --- | --- |
+| Q02 | Ventas pendientes con ID, total, nombre y matrícula del farmacéutico y datos de la sucursal. | `python -m src.queries.q02` | `pytest tests/test_q02.py` |
+| Q03 | Historial de ventas y recetas de un cliente, ordenado cronológicamente, con fecha, tipo de evento, ID y datos sin repetir fecha ni ID. | `python -m src.queries.q03 C001` | `pytest tests/test_q03.py` |
+| Q04 | Clientes con más de una receta distinta, indicando sus datos y la cantidad registrada, sin filtrar estados ni actividad. | `python -m src.queries.q04` | `pytest tests/test_q04.py` |
+| Q05 | Farmacéuticos activos y cantidad de ventas de los últimos 60 días, excluyendo anuladas e incluyendo profesionales con cero ventas. | `python -m src.queries.q05` | `pytest tests/test_q05.py` |
+| Q06 | Recetas vigentes de tratamiento prolongado cuya próxima dispensa es anterior a hoy, con los datos del cliente. | `python -m src.queries.q06` | `pytest tests/test_q06.py` |
+| Q10 | Clientes distintos atendidos en una sucursal, a través del farmacéutico que registró la venta, esté activo o no. | `python -m src.queries.q10 S001` | `pytest tests/test_q10.py` |
+
+Reemplazar `C001` por el ID del cliente a consultar y `S001` por el ID de la sucursal a
+consultar. Q05 usa hoy y los 59 días anteriores; Q06 excluye las dispensas
+previstas para hoy. Ambas calculan la fecha actual en la zona horaria de Argentina.
+
+Las pruebas de la tabla requieren el servicio aislado `neo4j-test`. Prepararlo una vez antes de ejecutar las pruebas individuales:
+
+```bash
+docker compose --profile test up -d --wait neo4j-test
+export NEO4J_TEST_URI='bolt://localhost:7688'
+export NEO4J_TEST_USER='neo4j'
+export NEO4J_TEST_PASSWORD='test_password'
+```
+
+---
+
 ## Pruebas
 
 Comandos útiles:
@@ -142,11 +176,29 @@ Comandos útiles:
 pytest -m "not integration"
 
 # Integración desde el host, con servicios levantados
+docker compose --profile test up -d --wait neo4j-test
 MONGO_URI='mongodb://localhost:27017/?directConnection=true&replicaSet=rs0' \
-NEO4J_URI='bolt://localhost:7687' pytest
+NEO4J_URI='bolt://localhost:7687' \
+NEO4J_TEST_URI='bolt://localhost:7688' \
+NEO4J_TEST_USER='neo4j' \
+NEO4J_TEST_PASSWORD='test_password' \
+pytest
 ```
 
-Resultado esperado: `32 passed` con los servicios activos; `25 passed, 7 skipped` sin ellos.
+### Pruebas de consultas Neo4j aisladas
+
+El servicio `neo4j-test` no se inicia con los servicios habituales.
+Para ejecutar juntas las pruebas de Q02, Q03, Q04, Q05, Q06 y Q10, usar la
+preparación indicada en «Consultas Neo4j» y luego:
+
+```bash
+pytest tests/test_q02.py tests/test_q03.py tests/test_q04.py tests/test_q05.py tests/test_q06.py tests/test_q10.py
+```
+
+El fixture falla con un mensaje accionable si el servicio no está disponible o
+si `NEO4J_TEST_URI` coincide con el endpoint configurado para la aplicación.
+Las pruebas limpian únicamente el grafo del servicio aislado. Al terminar, se
+puede detener ese contenedor con `docker compose --profile test stop neo4j-test`.
 
 ---
 
@@ -192,7 +244,8 @@ python -m src.cli seed
 │   ├── cli.py              # comandos del cliente
 │   ├── config.py
 │   ├── db/                 # conexión y espera de servicios
-│   └── loaders/            # CSV, MongoDB, proyección Neo4j
+│   ├── loaders/            # CSV, MongoDB, proyección Neo4j
+│   └── queries/            # consultas y servicios por número (q01 a q15)
 ├── tests/
 ├── .env.example
 └── pyproject.toml
