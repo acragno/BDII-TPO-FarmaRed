@@ -7,7 +7,7 @@ from datetime import date, timedelta
 import pytest
 
 from src.db.neo4j import NEO4J_DATABASE
-from src.queries.q05 import ZONA_HORARIA, q05
+from src.queries.q05 import q05
 
 
 @pytest.mark.integration
@@ -69,13 +69,13 @@ def test_q05_sin_profesionales_activos(neo4j_test_driver) -> None:
 
 
 @pytest.mark.integration
-def test_q05_usa_fecha_actual_en_argentina(neo4j_test_driver) -> None:
+def test_q05_usa_fecha_actual_del_sistema(neo4j_test_driver) -> None:
     with neo4j_test_driver.session(database=NEO4J_DATABASE) as session:
         session.run("""
             CREATE (f:Farmaceutico {id_farmaceutico: 'F1', activo: true})
             CREATE (f)-[:REGISTRO]->(:Venta {id_venta: 'V1',
-                fecha: date({timezone: $zona}), estado: 'Completada'})
-        """, zona=ZONA_HORARIA.key).consume()
+                fecha: $hoy, estado: 'Completada'})
+        """, hoy=date.today()).consume()
         assert q05(session) == [{
             "farmaceutico": {"id_farmaceutico": "F1", "activo": True},
             "cantidad_ventas": 1,

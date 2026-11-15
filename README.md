@@ -176,7 +176,7 @@ Reemplazar `C001` por el ID del cliente a consultar y `S001` por el ID de la suc
 consultar. Q05 usa hoy y los 59 días anteriores; Q06 excluye las dispensas
 previstas para hoy. Q12 incluye desde la misma fecha del año anterior hasta hoy;
 para el 29 de febrero toma el 28 de febrero del año anterior. Las tres calculan
-la fecha actual en la zona horaria de Argentina.
+la fecha local del sistema mediante `date.today()`, sin convertir la zona horaria.
 
 Las pruebas de la tabla requieren el servicio aislado `neo4j-test`. Prepararlo una vez antes de ejecutar las pruebas individuales:
 

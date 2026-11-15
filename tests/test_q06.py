@@ -8,7 +8,7 @@ import pytest
 from neo4j.time import Date
 
 from src.db.neo4j import NEO4J_DATABASE
-from src.queries.q06 import ZONA_HORARIA, q06
+from src.queries.q06 import q06
 
 
 @pytest.mark.integration
@@ -73,17 +73,17 @@ def test_q06_sin_recetas(neo4j_test_driver) -> None:
 
 
 @pytest.mark.integration
-def test_q06_usa_fecha_actual_en_argentina(neo4j_test_driver) -> None:
+def test_q06_usa_fecha_actual_del_sistema(neo4j_test_driver) -> None:
     with neo4j_test_driver.session(database=NEO4J_DATABASE) as session:
         session.run("""
             CREATE (c:Cliente {id_cliente: 'C1', activo: true})
             CREATE (c)-[:TIENE_RECETA]->(r:Receta {id_receta: 'R1',
                 tipo: 'Tratamiento prolongado', estado: 'Vigente',
-                proxima_dispensa: date({timezone: $zona}) - duration('P1D')})
+                proxima_dispensa: $hoy - duration('P1D')})
             CREATE (c)-[:TIENE_RECETA]->(:Receta {id_receta: 'HOY',
                 tipo: 'Tratamiento prolongado', estado: 'Vigente',
-                proxima_dispensa: date({timezone: $zona})})
-        """, zona=ZONA_HORARIA.key).consume()
+                proxima_dispensa: $hoy})
+        """, hoy=date.today()).consume()
         resultado = q06(session)
         assert len(resultado) == 1
         assert resultado[0]["receta"]["id_receta"] == "R1"

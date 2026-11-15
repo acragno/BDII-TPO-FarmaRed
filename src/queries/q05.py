@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from neo4j import Session, Transaction
 
 from src.config import Config
 from src.db.neo4j import NEO4J_DATABASE, create_driver
-
-ZONA_HORARIA = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 def q05(
@@ -22,7 +19,7 @@ def q05(
 
     Motor: Neo4j. Recibe una sesión o transacción del llamador y no la cierra.
     hoy permite fijar la fecha de referencia en pruebas; por defecto se obtiene
-    del reloj del sistema en America/Argentina/Buenos_Aires.
+    del sistema mediante date.today(), sin convertir la zona horaria.
     La ventana abarca 60 fechas calendario incluyendo hoy:
     [hoy - 59 días, mañana). La proyección almacena Venta.fecha como Date.
 
@@ -32,7 +29,7 @@ def q05(
     como desempate. Sin profesionales activos, devuelve [].
     """
     if hoy is None:
-        hoy = datetime.now(ZONA_HORARIA).date()
+        hoy = date.today()
     inicio = hoy - timedelta(days=59)
     fin = hoy + timedelta(days=1)
     query = """

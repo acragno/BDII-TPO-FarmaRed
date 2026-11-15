@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from neo4j import Session, Transaction
 
 from src.config import Config
 from src.db.neo4j import NEO4J_DATABASE, create_driver
-
-ZONA_HORARIA = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 def q12(
@@ -21,7 +18,8 @@ def q12(
     """Obtiene en Neo4j los clientes sin ventas durante el último año calendario.
 
     Recibe una sesión o transacción del llamador y no la cierra. hoy es una fecha
-    opcional para pruebas; por defecto se usa la fecha actual de Argentina.
+    opcional para pruebas; por defecto se usa la fecha local del sistema
+    mediante date.today().
     La ventana es [misma fecha del año anterior, mañana). Para el 29 de febrero
     se toma el 28 de febrero del año anterior. No equivale siempre a 365 días.
 
@@ -31,7 +29,7 @@ def q12(
     id_cliente ascendente; sin coincidencias, devuelve [].
     """
     if hoy is None:
-        hoy = datetime.now(ZONA_HORARIA).date()
+        hoy = date.today()
     try:
         inicio = hoy.replace(year=hoy.year - 1)
     except ValueError:

@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import date
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from neo4j import Session, Transaction
 
 from src.config import Config
 from src.db.neo4j import NEO4J_DATABASE, create_driver
-
-ZONA_HORARIA = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 def q06(
@@ -22,7 +19,7 @@ def q06(
 
     Motor: Neo4j. Recibe una sesión o transacción del llamador y no la cierra.
     hoy permite fijar la fecha de referencia en pruebas; por defecto se obtiene
-    del reloj del sistema en America/Argentina/Buenos_Aires.
+    del sistema mediante date.today(), sin convertir la zona horaria.
     Exige proxima_dispensa no nula y estrictamente anterior a hoy: las dispensas
     previstas para hoy no están atrasadas. No filtra la actividad del cliente.
 
@@ -31,7 +28,7 @@ def q06(
     dispensa ascendente e id_receta como desempate. Sin coincidencias, devuelve [].
     """
     if hoy is None:
-        hoy = datetime.now(ZONA_HORARIA).date()
+        hoy = date.today()
     query = """
         MATCH (c:Cliente)-[:TIENE_RECETA]->(r:Receta)
         WHERE r.tipo = 'Tratamiento prolongado'

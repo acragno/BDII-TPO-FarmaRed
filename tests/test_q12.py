@@ -7,7 +7,7 @@ from datetime import date, timedelta
 import pytest
 
 from src.db.neo4j import NEO4J_DATABASE
-from src.queries.q12 import ZONA_HORARIA, q12
+from src.queries.q12 import q12
 
 
 @pytest.mark.integration
@@ -70,6 +70,6 @@ def test_q12_sin_coincidencias_y_fecha_actual(neo4j_test_driver) -> None:
         session.run("""
             CREATE (c:Cliente {id_cliente: 'C1'})
             CREATE (c)-[:REALIZO]->(:Venta {id_venta: 'V1', estado: 'Anulada',
-                fecha: date({timezone: $zona})})
-        """, zona=ZONA_HORARIA.key).consume()
+                fecha: $hoy})
+        """, hoy=date.today()).consume()
         assert q12(session) == []
