@@ -98,7 +98,7 @@ def test_load_is_idempotent(mongo_test_db, include_extra: bool) -> None:
     assert first_indexes["clientes"] == ["uniq_clientes_dni"]
 
     collections = set(mongo_test_db.list_collection_names())
-    assert collections == set(LOAD_ORDER)
+    assert collections == set(LOAD_ORDER) | {"outbox"}
     assert "detalle_ventas" not in collections
 
     for table, expected in expected_collections.items():
