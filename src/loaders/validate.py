@@ -240,39 +240,48 @@ class ValidationResult:
 
 @dataclass
 class _ParsedRow:
+    filename: str
     line: int
     data: dict[str, Any]
 
 
-def validate_data(data_dir: Path) -> ValidationResult:
+def validate_data(data_dir: Path, *extra_dirs: Path) -> ValidationResult:
+    """Valida los directorios como un único dataset, incluidas sus referencias."""
     result = ValidationResult()
 
-    if not data_dir.is_dir():
-        result.issues.append(
-            ValidationIssue(
-                str(data_dir), None, "no existe el directorio de datos"
+    for directory in (data_dir, *extra_dirs):
+        if not directory.is_dir():
+            result.issues.append(
+                ValidationIssue(
+                    str(directory), None, "no existe el directorio de datos"
+                )
             )
-        )
+    if result.issues:
         return result
 
     parsed: dict[str, list[_ParsedRow]] = {}
     structure_failed = False
 
     for name, spec in TABLES.items():
-        try:
-            csv_rows = read_table(
-                data_dir / spec.filename, spec.filename, spec.headers
+        rows: list[_ParsedRow] = []
+        for directory in (data_dir, *extra_dirs):
+            filename = (
+                spec.filename
+                if directory == data_dir
+                else str(directory / spec.filename)
             )
-        except CsvStructureError as error:
-            result.issues.append(
-                ValidationIssue(error.filename, error.line, error.message)
-            )
-            structure_failed = True
-            parsed[name] = []
-            result.records[name] = []
-            continue
+            try:
+                csv_rows = read_table(
+                    directory / spec.filename, filename, spec.headers
+                )
+            except CsvStructureError as error:
+                result.issues.append(
+                    ValidationIssue(error.filename, error.line, error.message)
+                )
+                structure_failed = True
+                continue
 
-        rows = _normalize_rows(spec, csv_rows, result.issues)
+            rows.extend(_normalize_rows(spec, csv_rows, result.issues, filename))
         _check_unique_fields(spec, rows, result.issues)
         parsed[name] = rows
         result.records[name] = [row.data for row in rows]
@@ -288,7 +297,10 @@ def validate_data(data_dir: Path) -> ValidationResult:
 
 
 def _normalize_rows(
-    spec: TableSpec, csv_rows: list[CsvRow], issues: list[ValidationIssue]
+    spec: TableSpec,
+    csv_rows: list[CsvRow],
+    issues: list[ValidationIssue],
+    filename: str,
 ) -> list[_ParsedRow]:
     rows: list[_ParsedRow] = []
 
@@ -302,14 +314,16 @@ def _normalize_rows(
                 data[field_spec.name] = None
                 issues.append(
                     ValidationIssue(
-                        spec.filename,
+                        filename,
                         csv_row.line,
                         f"{field_spec.name}: {error}",
                     )
                 )
 
         if data.get(spec.id_field):
-            rows.append(_ParsedRow(line=csv_row.line, data=data))
+            rows.append(
+                _ParsedRow(filename=filename, line=csv_row.line, data=data)
+            )
 
     return rows
 
@@ -409,10 +423,10 @@ def _check_unique_fields(
             if previous is not None:
                 issues.append(
                     ValidationIssue(
-                        spec.filename,
+                        row.filename,
                         row.line,
                         f"{field_name} duplicado: '{value}' "
-                        f"(también en la línea {previous.line})",
+                        f"(también en {previous.filename}:{previous.line})",
                     )
                 )
             else:
@@ -438,7 +452,7 @@ def _check_references(
                 if value not in target_ids:
                     issues.append(
                         ValidationIssue(
-                            spec.filename,
+                            row.filename,
                             row.line,
                             f"{field_name} '{value}' no existe en "
                             f"{target_spec.filename}",
@@ -449,7 +463,6 @@ def _check_references(
 def _check_recipe_rules(
     parsed: dict[str, list[_ParsedRow]], issues: list[ValidationIssue]
 ) -> None:
-    spec = TABLES["recetas"]
     for row in parsed["recetas"]:
         authorized = row.data.get("dispensas_autorizadas")
         used = row.data.get("dispensas_realizadas")
@@ -457,7 +470,7 @@ def _check_recipe_rules(
             if used > authorized:
                 issues.append(
                     ValidationIssue(
-                        spec.filename,
+                        row.filename,
                         row.line,
                         f"dispensas_realizadas ({used}) supera "
                         f"dispensas_autorizadas ({authorized})",
@@ -473,8 +486,6 @@ def _check_sale_recipe_client(
         for row in parsed["recetas"]
         if row.data.get("id_receta")
     }
-    spec = TABLES["ventas"]
-
     for row in parsed["ventas"]:
         recipe_id = row.data.get("id_receta")
         if not recipe_id:
@@ -485,7 +496,7 @@ def _check_sale_recipe_client(
         if row.data.get("id_cliente") != expected_client:
             issues.append(
                 ValidationIssue(
-                    spec.filename,
+                    row.filename,
                     row.line,
                     f"id_receta '{recipe_id}' pertenece al cliente "
                     f"'{expected_client}', no a '{row.data.get('id_cliente')}'",

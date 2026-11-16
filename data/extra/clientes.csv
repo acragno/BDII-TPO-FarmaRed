@@ -1,0 +1,11 @@
+id_cliente,nombre,apellido,dni,email,telefono,ciudad,provincia,obra_social,nro_afiliado,activo
+C009,Valentina,Ferrero,32678109,valentina.ferrero@example.org,3415101009,Rosario,Santa Fe,OSDE,OS-420009,True
+C010,Tomás,Aguilar,35489210,tomas.aguilar@example.org,2215101010,La Plata,Buenos Aires,Swiss Medical,SM-420010,True
+C011,Paula,Sosa,38190211,paula.sosa@example.org,3515101011,Córdoba,Córdoba,Sin cobertura,,True
+C012,Diego,Peralta,29801312,diego.peralta@example.org,2235101012,Mar del Plata,Buenos Aires,IOMA,IO-420012,True
+C013,Elena,Molina,16512413,elena.molina@example.org,3425101013,Santa Fe,Santa Fe,PAMI,PA-420013,True
+C014,Andrés,Vega,27423514,andres.vega@example.org,3585101014,Río Cuarto,Córdoba,Sin cobertura,,True
+C015,Camila,Acosta,41634615,camila.acosta@example.org,3415101015,Rosario,Santa Fe,Galeno,GA-420015,True
+C016,Nicolás,Suárez,33745716,nicolas.suarez@example.org,2495101016,Tandil,Buenos Aires,OSDE,OS-420016,True
+C017,Graciela,Leiva,18756817,graciela.leiva@example.org,3492511017,Rafaela,Santa Fe,PAMI,PA-420017,True
+C018,Esteban,Correa,26767918,esteban.correa@example.org,3535101018,Villa María,Córdoba,Sin cobertura,,False

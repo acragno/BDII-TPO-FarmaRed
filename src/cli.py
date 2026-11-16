@@ -111,7 +111,7 @@ def _show_config(_: argparse.Namespace) -> int:
 
 def _validate_data(_: argparse.Namespace) -> int:
     config = Config.from_env()
-    result = validate_data(config.data_dir)
+    result = validate_data(config.data_dir, config.data_dir / "extra")
 
     if not result.ok:
         _print_validation_issues(result)
@@ -125,7 +125,7 @@ def _validate_data(_: argparse.Namespace) -> int:
 
 def _load_mongodb(_: argparse.Namespace) -> int:
     config = Config.from_env()
-    result = validate_data(config.data_dir)
+    result = validate_data(config.data_dir, config.data_dir / "extra")
 
     if not result.ok:
         _print_validation_issues(result)
@@ -204,7 +204,7 @@ def _wait_for_services(args: argparse.Namespace) -> int:
 
 def _seed(args: argparse.Namespace) -> int:
     config = Config.from_env()
-    result = validate_data(config.data_dir)
+    result = validate_data(config.data_dir, config.data_dir / "extra")
 
     if not result.ok:
         _print_validation_issues(result)

@@ -22,6 +22,74 @@ def test_valid_dataset_loads_every_table() -> None:
     assert result.counts() == EXPECTED_COUNTS
 
 
+def test_extra_dataset_adds_ten_valid_records_per_table() -> None:
+    result = validate_data(DATA_DIR, DATA_DIR / "extra")
+
+    assert result.ok, [str(issue) for issue in result.issues]
+    assert result.counts() == {
+        table: count + 10 for table, count in EXPECTED_COUNTS.items()
+    }
+
+
+@pytest.mark.parametrize(
+    ("filename", "id_field", "id_value", "column", "value"),
+    [
+        ("clientes.csv", "id_cliente", "C009", "id_cliente", "C001"),
+        ("clientes.csv", "id_cliente", "C009", "dni", "31245678"),
+        ("farmaceuticos.csv", "id_farmaceutico", "F008", "matricula", "MN-18041"),
+    ],
+)
+def test_duplicates_between_original_and_extra_are_rejected(
+    dataset: Path,
+    filename: str,
+    id_field: str,
+    id_value: str,
+    column: str,
+    value: str,
+) -> None:
+    extra_dir = dataset / "extra"
+    DatasetEditor(extra_dir).set_value(
+        filename, id_field, id_value, column, value
+    )
+
+    result = validate_data(dataset, extra_dir)
+
+    assert any(
+        issue.filename == str(extra_dir / filename)
+        and f"{column} duplicado: '{value}'" in issue.message
+        for issue in result.issues
+    )
+
+
+def test_extra_invalid_reference_reports_its_source(dataset: Path) -> None:
+    extra_dir = dataset / "extra"
+    DatasetEditor(extra_dir).set_value(
+        "farmaceuticos.csv", "id_farmaceutico", "F008", "id_sucursal", "S999"
+    )
+
+    result = validate_data(dataset, extra_dir)
+
+    assert any(
+        issue.filename == str(extra_dir / "farmaceuticos.csv")
+        and issue.line == 2
+        and "id_sucursal 'S999' no existe" in issue.message
+        for issue in result.issues
+    )
+
+
+def test_missing_extra_file_is_rejected(dataset: Path) -> None:
+    extra_dir = dataset / "extra"
+    (extra_dir / "ventas.csv").unlink()
+
+    result = validate_data(dataset, extra_dir)
+
+    assert any(
+        issue.filename == str(extra_dir / "ventas.csv")
+        and issue.message == "no existe"
+        for issue in result.issues
+    )
+
+
 def test_types_are_converted_once() -> None:
     result = validate_data(DATA_DIR)
 

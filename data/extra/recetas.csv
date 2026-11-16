@@ -1,0 +1,11 @@
+id_receta,id_cliente,medico,matricula_medico,fecha_emision,tipo,dispensas_autorizadas,dispensas_realizadas,proxima_dispensa,estado
+RC010,C009,Dra. Irene Salcedo,MP-61010,2026-10-14,Tratamiento prolongado,3,2,2026-12-13,Vigente
+RC011,C009,Dr. Sergio Oliva,MP-61011,2026-09-17,Tratamiento prolongado,3,1,2026-10-17,Vigente
+RC012,C010,Dra. Malena Rivas,MP-61012,2026-11-15,Tratamiento prolongado,3,0,2026-11-15,Vigente
+RC013,C010,Dr. Hernán Luján,MP-61013,2026-11-14,Archivada,1,1,,Completada
+RC014,C010,Dra. Malena Rivas,MP-61012,2026-11-15,Simple,1,0,,Vigente
+RC015,C011,Dr. Bruno Valdés,MP-61015,2026-08-01,Simple,1,0,,Vencida
+RC016,C012,Dra. Alicia Ponce,MP-61016,2026-11-15,Tratamiento prolongado,3,0,2026-11-16,Vigente
+RC017,C015,Dr. Emiliano Serra,MP-61017,2026-05-01,Simple,1,0,,Vencida
+RC018,C017,Dra. Inés Duarte,MP-61018,2026-11-15,Simple,1,0,,Vigente
+RC019,C018,Dr. Hernán Luján,MP-61013,2026-01-20,Archivada,1,0,,Vencida

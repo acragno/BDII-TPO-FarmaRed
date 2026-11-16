@@ -77,8 +77,10 @@ def test_details_are_embedded_and_sorted() -> None:
 
 
 @pytest.mark.integration
-def test_load_is_idempotent(mongo_test_db) -> None:
-    result = validate_data(DATA_DIR)
+@pytest.mark.parametrize("include_extra", [False, True])
+def test_load_is_idempotent(mongo_test_db, include_extra: bool) -> None:
+    extra_dirs = (DATA_DIR / "extra",) if include_extra else ()
+    result = validate_data(DATA_DIR, *extra_dirs)
     assert result.ok, [str(issue) for issue in result.issues]
 
     first = load_dataset(mongo_test_db, result.records)
@@ -87,17 +89,21 @@ def test_load_is_idempotent(mongo_test_db) -> None:
     ensure_indexes(mongo_test_db)
 
     assert first == second
-    assert first.collections == EXPECTED_COLLECTIONS
-    assert first.items == EXPECTED_COUNTS["detalle_ventas"]
+    expected_collections = {
+        table: count + (10 if include_extra else 0)
+        for table, count in EXPECTED_COLLECTIONS.items()
+    }
+    assert first.collections == expected_collections
+    assert first.items == result.counts()["detalle_ventas"]
     assert first_indexes["clientes"] == ["uniq_clientes_dni"]
 
     collections = set(mongo_test_db.list_collection_names())
     assert collections == set(LOAD_ORDER)
     assert "detalle_ventas" not in collections
 
-    for table, expected in EXPECTED_COLLECTIONS.items():
+    for table, expected in expected_collections.items():
         assert mongo_test_db[table].count_documents({}) == expected
-    assert len(mongo_test_db["ventas"].distinct("_id")) == EXPECTED_COUNTS["ventas"]
+    assert len(mongo_test_db["ventas"].distinct("_id")) == expected_collections["ventas"]
 
 
 @pytest.mark.integration

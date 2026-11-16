@@ -1,0 +1,11 @@
+id_sucursal,nombre,tipo,direccion,ciudad,provincia,telefono,activo
+S006,Farmacia Rosario Norte,Farmacia,Av. Alberdi 1800,Rosario,Santa Fe,3414606006,True
+S007,Farmacia La Plata Centro,Farmacia,Calle 7 1040,La Plata,Buenos Aires,2214607007,True
+S008,Farmacia Córdoba Alberdi,Farmacia,Av. Colón 2150,Córdoba,Córdoba,3514608008,True
+S009,Farmacia Mar del Plata,Farmacia,Av. Independencia 2400,Mar del Plata,Buenos Aires,2234609009,True
+S010,Farmacia Santa Fe Sur,Farmacia,Av. General López 2950,Santa Fe,Santa Fe,3424610010,True
+S011,Farmacia Río Cuarto,Farmacia,San Martín 650,Río Cuarto,Córdoba,3584611011,True
+S012,Farmacia Tandil Centro,Farmacia,Rodríguez 720,Tandil,Buenos Aires,2494612012,True
+S013,Farmacia Rafaela,Farmacia,Bv. Santa Fe 460,Rafaela,Santa Fe,3492461013,True
+S014,Farmacia Villa María,Farmacia,San Martín 1120,Villa María,Córdoba,3534614014,False
+S015,Droguería Litoral,Droguería,Av. Circunvalación 6100,Rosario,Santa Fe,3414615015,True

@@ -1,0 +1,11 @@
+id_proveedor,razon_social,cuit,tipo,ciudad,provincia,telefono,activo
+PRV006,Laboratorios Sierra Clara S.A.,30-72001006-1,Laboratorio,Rosario,Santa Fe,3414306006,True
+PRV007,Droguería Costa Azul S.R.L.,30-72001007-8,Droguería,La Plata,Buenos Aires,2214307007,True
+PRV008,Laboratorios Monte Claro S.A.,30-72001008-6,Laboratorio,Córdoba,Córdoba,3514308008,True
+PRV009,Laboratorios Puerto Sereno S.A.,30-72001009-4,Laboratorio,Mar del Plata,Buenos Aires,2234309009,True
+PRV010,Droguería Río de Luz S.R.L.,30-72001010-8,Droguería,Santa Fe,Santa Fe,3424310010,True
+PRV011,Laboratorios Valle Celeste S.A.,30-72001011-6,Laboratorio,Río Cuarto,Córdoba,3584311011,True
+PRV012,Distribuidora Cerro Verde S.A.,30-72001012-4,Droguería,Tandil,Buenos Aires,2494312012,True
+PRV013,Laboratorios Horizonte Sur S.A.,30-72001013-2,Laboratorio,Rafaela,Santa Fe,3492431013,True
+PRV014,Laboratorios Llanura Azul S.A.,30-72001014-0,Laboratorio,Villa María,Córdoba,3534314014,True
+PRV015,Droguería Estrella Austral S.R.L.,30-72001015-9,Droguería,Bahía Blanca,Buenos Aires,2914315015,False

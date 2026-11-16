@@ -1,0 +1,11 @@
+id_producto,nombre,principio_activo,categoria,presentacion,condicion_venta,precio_unit,id_proveedor,activo
+PRD014,Paracetamol 1g x16,Paracetamol,Analgésico,Comprimidos x16,Venta libre,3200,PRV006,True
+PRD015,Ibuprofeno 200mg x12,Ibuprofeno,Antiinflamatorio,Comprimidos x12,Venta libre,2500,PRV007,True
+PRD016,Enalapril 10mg x30,Enalapril,Antihipertensivo,Comprimidos x30,Bajo receta,6800,PRV008,True
+PRD017,Clonazepam 1mg x30,Clonazepam,Ansiolítico,Comprimidos x30,Bajo receta archivada,8100,PRV009,True
+PRD018,Cetirizina 10mg x10,Cetirizina,Antihistamínico,Comprimidos x10,Venta libre,4999,PRV010,True
+PRD019,Solución fisiológica 500ml,Cloruro de sodio 0.9%,Solución salina,Solución 500 ml,Venta libre,5000,PRV011,True
+PRD020,Crema humectante 100g,Glicerina,Dermocosmética,Crema 100 g,Venta libre,4600,PRV012,True
+PRD021,Sales de rehidratación oral x6,Sales de rehidratación,Rehidratación oral,Sobres x6,Venta libre,2400,PRV013,True
+PRD022,Amlodipina 5mg x30,Amlodipina,Antihipertensivo,Comprimidos x30,Bajo receta,7500,PRV014,True
+PRD023,Antiséptico tópico 100ml,Clorhexidina 2%,Antiséptico,Solución 100 ml,Venta libre,1900,PRV015,False
