@@ -313,9 +313,6 @@ python -m src.cli seed
 ├── data/                   # 9 CSV de entrada
 ├── docker/mongo-init/      # inicialización idempotente del replica set
 ├── docker-compose.yml      # MongoDB, mongo-init y Neo4j
-├── docs/
-│   ├── distribucion_datos.md
-│   └── resolucion_queries.md
 ├── scripts/
 │   ├── seed.sh
 │   └── reset.sh
