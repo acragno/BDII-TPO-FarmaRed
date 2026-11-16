@@ -87,7 +87,7 @@ Desde el host es necesario `directConnection=true`: el replica set anuncia el ho
 | `NEO4J_URI`      | `bolt://neo4j:7687`                     | Endpoint Bolt de Neo4j           |
 | `NEO4J_USER`     | `neo4j`                                 | Usuario de Neo4j                 |
 | `NEO4J_PASSWORD` | `development_password`                  | Contraseña de Neo4j              |
-| `DATA_DIR`       | `./data`                                | Directorio de los CSV de entrada |
+| `DATA_DIR`       | `./data`                                | Directorio de los CSV originales y su subcarpeta `extra/` |
 
 ---
 
@@ -123,6 +123,21 @@ python -m src.cli seed
 # o, usando el script (levanta Docker primero)
 ./scripts/seed.sh
 ```
+
+`seed`, `load-mongodb` y `validate-data` leen los nueve CSV originales de `data/`
+y los nueve de `data/extra/`, con **10 registros ficticios nuevos por archivo**.
+Se validan juntos los tipos, IDs, DNI, matrículas y referencias antes de escribir
+en las bases. Si se configura `DATA_DIR`, también debe contener `extra/` con sus
+nueve CSV.
+
+La carga reutiliza el mismo cargador de MongoDB con los registros combinados:
+los IDs estables permiten repetirla sin duplicar documentos ni ítems. Luego
+se reconstruye la proyección de Neo4j desde MongoDB. Los datos representan una
+instantánea; repetir el seed repone los valores de los CSV.
+
+Los registros adicionales toman como referencia el **15/11/2026** e incluyen
+stock bajo o agotado, lotes vencidos y próximos a vencer, recetas vencidas,
+dispensas atrasadas, clientes sin compras y ventas pendientes y anuladas.
 
 ### Comandos individuales
 
@@ -310,7 +325,8 @@ python -m src.cli seed
 ```text
 .
 ├── .devcontainer/          # Codespaces con Docker-in-Docker
-├── data/                   # 9 CSV de entrada
+├── data/                   # 9 CSV originales
+│   └── extra/              # 9 CSV con 10 registros nuevos cada uno
 ├── docker/mongo-init/      # inicialización idempotente del replica set
 ├── docker-compose.yml      # MongoDB, mongo-init y Neo4j
 ├── scripts/
