@@ -9,6 +9,7 @@ from neo4j.exceptions import ServiceUnavailable
 from pymongo.errors import AutoReconnect
 
 from src.outbox_worker import (
+    completed_sale,
     delete_client,
     insert_client,
     process_batch,
@@ -187,6 +188,98 @@ def test_delete_is_logical_and_keeps_relationships():
     query = tx.run.call_args.args[0]
     assert "SET c.activo = false" in query
     assert "DELETE" not in query
+
+
+def sale_event(with_recipe=False):
+    payload = {
+        "_id": "V001", "id_venta": "V001", "id_cliente": "C001",
+        "id_farmaceutico": "F001", "fecha": datetime(2026, 11, 15, tzinfo=timezone.utc),
+        "tipo": "Con receta" if with_recipe else "Venta libre",
+        "medio_pago": "Efectivo", "total": 300, "estado": "Completada",
+        "stock_aplicado": True, "lotes_consumidos": [{"id_lote": "L001", "cantidad": 3}],
+        "items": [
+            {"id_detalle": detail, "id_producto": "P001", "cantidad": quantity, "precio_unit": 100}
+            for detail, quantity in (("D001", 1), ("D002", 2))
+        ],
+    }
+    if with_recipe:
+        payload["id_receta"] = "R001"
+        payload["receta"] = {
+            "_id": "R001", "dispensas_realizadas": 1,
+            "estado": "Completada", "proxima_dispensa": None,
+        }
+    return {**event(event_type="VentaCompletada", payload=payload), "entity_id": "V001"}
+
+
+@pytest.mark.parametrize("with_recipe", [False, True])
+def test_sale_projects_only_graph_properties(with_recipe):
+    tx = MagicMock()
+    tx.run.return_value.single.return_value = {"proyectados": 2}
+    created = sale_event(with_recipe)
+    original = deepcopy(created)
+    completed_sale(tx, created)
+
+    properties = tx.run.call_args_list[0].kwargs["properties"]
+    assert set(properties) == {"id_venta", "fecha", "tipo", "medio_pago", "total", "estado"}
+    assert properties["fecha"] == created["payload"]["fecha"].date()
+    assert tx.run.call_args_list[1].kwargs["items"] == created["payload"]["items"]
+    assert tx.run.call_count == (3 if with_recipe else 2)
+    if with_recipe:
+        assert tx.run.call_args.kwargs["properties"] == {
+            "dispensas_realizadas": 1, "estado": "Completada", "proxima_dispensa": None,
+        }
+    assert created == original
+
+
+def test_sale_with_missing_product_keeps_event_pending():
+    outbox, records = outbox_with([sale_event()])
+    driver, tx = driver_with_transaction()
+    tx.run.return_value.single.side_effect = [{"id_venta": "V001"}, {"proyectados": 0}]
+    with pytest.raises(ValueError, match="producto"):
+        process_batch(outbox, driver)
+    tx.commit.assert_not_called()
+    assert records[0]["state"] == "Pending"
+
+
+@pytest.mark.integration
+def test_sale_event_is_idempotent_and_completes_recipe(neo4j_test_driver):
+    with neo4j_test_driver.session() as session:
+        session.run(
+            "CREATE (c:Cliente {id_cliente: 'C001'}), "
+            "(:Farmaceutico {id_farmaceutico: 'F001'}), "
+            "(:Producto {id_producto: 'P001'}), "
+            "(r:Receta {id_receta: 'R001', estado: 'Vigente', dispensas_realizadas: 0, "
+            "proxima_dispensa: date('2026-11-15')}), (c)-[:TIENE_RECETA]->(r)"
+        ).consume()
+        created = sale_event(with_recipe=True)
+        session.execute_write(completed_sale, created)
+        session.execute_write(completed_sale, created)
+        record = session.run(
+            "MATCH (v:Venta {id_venta: 'V001'}) "
+            "RETURN properties(v) AS venta, "
+            "COUNT { (:Cliente)-[:REALIZO]->(v) } AS clientes, "
+            "COUNT { (:Farmaceutico)-[:REGISTRO]->(v) } AS farmaceuticos, "
+            "COUNT { (v)-[:INCLUYE]->() } AS items, "
+            "COUNT { (v)-[:UTILIZA]->() } AS recetas"
+        ).single()
+        assert record["clientes"] == record["farmaceuticos"] == record["recetas"] == 1
+        assert record["items"] == 2
+        assert set(record["venta"]) == {"id_venta", "fecha", "tipo", "medio_pago", "total", "estado"}
+        recipe = session.run("MATCH (r:Receta) RETURN properties(r) AS receta").single()["receta"]
+        assert recipe["estado"] == "Completada" and recipe["dispensas_realizadas"] == 1
+        assert "proxima_dispensa" not in recipe
+
+
+@pytest.mark.integration
+def test_missing_sale_product_rolls_back_graph_changes(neo4j_test_driver):
+    with neo4j_test_driver.session() as session:
+        session.run(
+            "CREATE (:Cliente {id_cliente: 'C001'}), "
+            "(:Farmaceutico {id_farmaceutico: 'F001'})"
+        ).consume()
+        with pytest.raises(ValueError, match="producto"):
+            session.execute_write(completed_sale, sale_event())
+        assert session.run("MATCH (v:Venta) RETURN count(v) AS n").single()["n"] == 0
 
 
 @pytest.mark.integration

@@ -6,10 +6,12 @@ from typing import Any
 from uuid import uuid4
 from datetime import datetime, timezone
 
-from pymongo import MongoClient
+from pymongo import MongoClient, ReadPreference
 from pymongo.database import Database
 from pymongo.client_session import ClientSession
 from pymongo.errors import PyMongoError
+from pymongo.read_concern import ReadConcern
+from pymongo.write_concern import WriteConcern
 
 from src.outbox import register_event
 from src.config import Config
@@ -37,7 +39,12 @@ def q13Insert(db: Database, mongo_client: MongoClient, client: dict[str, Any]) -
         return document
 
     with mongo_client.start_session() as session:
-        return session.with_transaction(callback)
+        return session.with_transaction(
+            callback,
+            read_preference=ReadPreference.PRIMARY,
+            read_concern=ReadConcern("snapshot"),
+            write_concern=WriteConcern(w="majority"),
+        )
 
 
 def q13Delete(db: Database, mongo_client: MongoClient, client_id: str) -> dict[str, Any]:
@@ -75,7 +82,12 @@ def q13Delete(db: Database, mongo_client: MongoClient, client_id: str) -> dict[s
         }
 
     with mongo_client.start_session() as session:
-        return session.with_transaction(callback)
+        return session.with_transaction(
+            callback,
+            read_preference=ReadPreference.PRIMARY,
+            read_concern=ReadConcern("snapshot"),
+            write_concern=WriteConcern(w="majority"),
+        )
 
 
 def q13Update(db: Database, mongo_client: MongoClient, client_id: str, modifications: dict[str, Any]) -> dict[str, Any]:
@@ -116,7 +128,12 @@ def q13Update(db: Database, mongo_client: MongoClient, client_id: str, modificat
         }
 
     with mongo_client.start_session() as session:
-        return session.with_transaction(callback)
+        return session.with_transaction(
+            callback,
+            read_preference=ReadPreference.PRIMARY,
+            read_concern=ReadConcern("snapshot"),
+            write_concern=WriteConcern(w="majority"),
+        )
 
 
 # Validar el formato del cliente para insertar.

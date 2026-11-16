@@ -19,6 +19,9 @@ BATCH_SIZE = 50
 IDLE_SECONDS = 1
 INITIAL_RETRY_SECONDS = 2
 MAX_RETRY_SECONDS = 30
+SALE_NODE_FIELDS = ("id_venta", "fecha", "tipo", "medio_pago", "total", "estado")
+SALE_ITEM_FIELDS = ("id_producto", "id_detalle", "cantidad", "precio_unit")
+RECIPE_UPDATE_FIELDS = ("dispensas_realizadas", "estado", "proxima_dispensa")
 logger = logging.getLogger(__name__)
 
 
@@ -66,10 +69,82 @@ def delete_client(tx: Transaction, event: dict[str, Any]) -> None:
         raise ValueError(f"El cliente {client_id} todavía no existe en Neo4j")
 
 
+def completed_sale(tx: Transaction, event: dict[str, Any]) -> None:
+    """Proyectar venta, detalles y receta en la transacción del consumidor."""
+    payload = event["payload"]
+    if not isinstance(payload, dict) or payload.get("id_venta") != event["entity_id"]:
+        raise ValueError("El payload debe contener el id_venta de entity_id")
+    properties = {field: payload[field] for field in SALE_NODE_FIELDS}
+    if properties["estado"] != "Completada":
+        raise ValueError("VentaCompletada requiere estado 'Completada'")
+    if isinstance(properties["fecha"], datetime):
+        properties["fecha"] = properties["fecha"].date()
+    items = [{field: item[field] for field in SALE_ITEM_FIELDS} for item in payload["items"]]
+    if not items:
+        raise ValueError("La venta necesita al menos un ítem")
+
+    sale_id = event["entity_id"]
+    result = tx.run(
+        """
+        MATCH (c:Cliente {id_cliente: $id_cliente})
+        MATCH (f:Farmaceutico {id_farmaceutico: $id_farmaceutico})
+        MERGE (v:Venta {id_venta: $id_venta})
+        SET v += $properties
+        MERGE (c)-[:REALIZO]->(v)
+        MERGE (f)-[:REGISTRO]->(v)
+        RETURN v.id_venta AS id_venta
+        """,
+        id_venta=sale_id,
+        id_cliente=payload["id_cliente"],
+        id_farmaceutico=payload["id_farmaceutico"],
+        properties=properties,
+    ).single()
+    if result is None:
+        raise ValueError("El cliente o farmacéutico todavía no existe en Neo4j")
+
+    result = tx.run(
+        """
+        MATCH (v:Venta {id_venta: $id_venta})
+        UNWIND $items AS item
+        MATCH (p:Producto {id_producto: item.id_producto})
+        MERGE (v)-[r:INCLUYE {id_detalle: item.id_detalle}]->(p)
+        SET r.cantidad = item.cantidad, r.precio_unit = item.precio_unit
+        RETURN count(r) AS proyectados
+        """,
+        id_venta=sale_id,
+        items=items,
+    ).single()
+    if result is None or result["proyectados"] != len(items):
+        raise ValueError("Algún producto de la venta todavía no existe en Neo4j")
+
+    if payload.get("id_receta"):
+        recipe = payload["receta"]
+        properties = {field: recipe[field] for field in RECIPE_UPDATE_FIELDS}
+        if isinstance(properties["proxima_dispensa"], datetime):
+            properties["proxima_dispensa"] = properties["proxima_dispensa"].date()
+        result = tx.run(
+            """
+            MATCH (c:Cliente {id_cliente: $id_cliente})-[:TIENE_RECETA]->
+                  (r:Receta {id_receta: $id_receta})
+            MATCH (v:Venta {id_venta: $id_venta})
+            SET r += $properties
+            MERGE (v)-[:UTILIZA]->(r)
+            RETURN r.id_receta AS id_receta
+            """,
+            id_cliente=payload["id_cliente"],
+            id_receta=payload["id_receta"],
+            id_venta=sale_id,
+            properties=properties,
+        ).single()
+        if result is None:
+            raise ValueError("La receta del cliente todavía no existe en Neo4j")
+
+
 EVENT_HANDLERS = {
     "InsertClient": insert_client,
     "UpdateClient": update_client,
     "DeleteClient": delete_client,
+    "VentaCompletada": completed_sale,
 }
 
 

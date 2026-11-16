@@ -211,18 +211,29 @@ export NEO4J_TEST_PASSWORD='test_password'
 
 Estos servicios realizan escrituras en MongoDB y muestran sus resultados en JSON.
 Antes de ejecutarlos, levantar los servicios y cargar los datos con `python -m src.cli seed`.
-Cada cambio se guarda junto con su evento en `outbox`, dentro de la misma transacción,
-para que el worker actualice la proyección de Neo4j.
+Q13 y Q14 guardan cada operación junto con su evento en `outbox`, dentro de la misma
+transacción, para que el worker actualice la proyección de Neo4j. Q15 participa en
+la transacción de Q14 y no emite eventos propios.
 
 | Servicio | Descripción | Ejecución | Prueba individual |
 | --- | --- | --- | --- |
 | Q13 — Alta | Crea un cliente validando sus datos, cobertura y DNI único. | `python -m src.queries.q13 alta --archivo cliente.json` | `pytest tests/test_q13.py` |
 | Q13 — Modificación | Actualiza los datos de contacto y cobertura de un cliente existente, validando la cobertura resultante. | `python -m src.queries.q13 modificacion C001 --archivo cambios.json` | `pytest tests/test_q13.py` |
 | Q13 — Baja lógica | Establece `activo = false` en un cliente existente, conservando sus datos históricos. | `python -m src.queries.q13 baja C001` | `pytest tests/test_q13.py` |
+| Q14 — Venta completada | Valida referencias, calcula precios y total, descuenta stock y actualiza la receta de forma atómica. | `python -m src.queries.q14 --archivo venta.json` | `pytest tests/test_q14.py` |
+| Q15 — Stock FEFO | Descuenta lotes vigentes y registra los consumos sin repetir el descuento. | Invocada por Q14 con la misma sesión; sin CLI propio. | `pytest tests/test_q15.py` |
 
 `cliente.json` debe contener los datos del cliente a crear. `cambios.json` debe ser
 un objeto JSON con uno o más de estos campos: `email`, `telefono`, `obra_social` y
 `nro_afiliado`. Reemplazar `C001` por el ID del cliente que se desea modificar o dar de baja.
+
+`venta.json` requiere `id_venta`, `id_cliente`, `id_farmaceutico`, `fecha`
+(`AAAA-MM-DD`), `tipo`, `medio_pago` e `items`. Cada ítem contiene `id_detalle`,
+`id_producto` y `cantidad`. Las ventas `Con receta` requieren `id_receta`.
+El servicio fija el estado `Completada`, toma los precios del catálogo y calcula
+el total; esos campos no se aceptan en la entrada. La próxima dispensa se calcula
+a 30 días de la fecha de venta si quedan dispensas del tratamiento prolongado.
+Si falla el stock, la receta o el outbox, se revierte toda la operación.
 
 ---
 
